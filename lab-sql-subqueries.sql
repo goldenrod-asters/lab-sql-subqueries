@@ -79,17 +79,60 @@ LIMIT 1;
 SELECT title
 FROM film
 WHERE film_id IN (SELECT film_id
-					FROM inventory
-					WHERE inventory_id IN (SELECT inventory_id
+				FROM inventory
+				WHERE inventory_id IN (SELECT inventory_id
+										FROM rental
+										WHERE rental_id IN (SELECT rental_id
+															FROM payment
+															WHERE customer_id = (SELECT customer_id
+																				FROM payment
+																				GROUP BY customer_id
+																				ORDER BY SUM(amount) DESC
+																				LIMIT 1))))
+ORDER BY title;
+
+# check
+SELECT inventory_id
 											FROM rental
 											WHERE rental_id IN (SELECT rental_id
 																FROM payment
                                                                 WHERE customer_id = (SELECT customer_id
 																					FROM payment
 																					GROUP BY customer_id
-																					ORDER BY sum(amount)
-																					LIMIT 1))));
+																					ORDER BY sum(amount) DESC
+																					LIMIT 1));
                                                                                     
+SELECT customer_id
+FROM payment
+GROUP BY customer_id
+ORDER BY sum(amount) DESC
+LIMIT 1;
+                                                                                    
+-- 8. Retrieve the client_id and the total_amount_spent of those clients who spent more than the average of 
+-- 	  the total_amount spent by each client
+# WHERE does not allow agg functions
 
+SELECT customer_id, AVG(amount) AS avg_spent_per_customer
+FROM payment
+GROUP BY customer_id;
+# need average of the total spent per customer, not just average of all payments
 
+SELECT SUM(amount) AS total_spent_pc # this is our baby query, which becomes a table that we can insert into FROM
+FROM payment
+GROUP BY customer_id;
+
+# determine what our average of total is:
+SELECT AVG(total_spent_pc) AS avg_spent_pc # this is our child query
+FROM (SELECT SUM(amount) AS total_spent_pc # this is our baby query inserted into FROM
+		FROM payment
+		GROUP BY customer_id) as t; 
+        
+
+SELECT customer_id, SUM(amount) AS total_spent_pc
+FROM payment
+GROUP BY customer_id
+HAVING SUM(amount) > (SELECT AVG(total_spent)  # this is our child query, inserted into HAVING
+					FROM (SELECT SUM(amount) AS total_spent  # this is our baby query
+							FROM payment
+							GROUP BY customer_id) as t);
 
